@@ -6,7 +6,7 @@ import (
 	"github.com/joho/godotenv"
 )
 
-type EnvVar interface {
+type envVar interface {
 	FFMPEGPath() string
 	BentoPath() string
 	DashPath() string
@@ -15,16 +15,16 @@ type EnvVar interface {
 	loadVariablesFromDotEnv() error
 }
 
-type EnvVarImpl struct {
-	FFMPEGFullPath  string
-	BentoFullPath   string
-	DashFullPath    string
-	SrcVidFullPath  string
-	OutputDirectory string
+type envVarImpl struct {
+	ffmpegFullPath  string
+	bentoFullPath   string
+	dashFullPath    string
+	srcVidFullPath  string
+	outputDirectory string
 }
 
 var (
-	Env EnvVar
+	Env envVar
 )
 
 func InitEnvironmentVariables() error {
@@ -38,42 +38,42 @@ func InitEnvironmentVariables() error {
 	return nil
 }
 
-func (e *EnvVarImpl) FFMPEGPath() string {
-	return e.FFMPEGFullPath
+func (e *envVarImpl) FFMPEGPath() string {
+	return e.ffmpegFullPath
 }
 
-func (e *EnvVarImpl) BentoPath() string {
-	return e.BentoFullPath
+func (e *envVarImpl) BentoPath() string {
+	return e.bentoFullPath
 }
 
-func (e *EnvVarImpl) DashPath() string {
-	return e.DashFullPath
+func (e *envVarImpl) DashPath() string {
+	return e.dashFullPath
 }
 
-func (e *EnvVarImpl) SrcVidPath() string {
-	return e.SrcVidFullPath
+func (e *envVarImpl) SrcVidPath() string {
+	return e.srcVidFullPath
 }
 
-func (e *EnvVarImpl) OutputDir() string {
-	return e.OutputDirectory
+func (e *envVarImpl) OutputDir() string {
+	return e.outputDirectory
 }
 
-func (e *EnvVarImpl) loadVariablesFromDotEnv() error {
+func (e *envVarImpl) loadVariablesFromDotEnv() error {
 	err := godotenv.Load()
 	if err != nil {
 		return err
 	}
 
-	e.FFMPEGFullPath = os.Getenv("FFMPEG_PATH")
-	e.BentoFullPath = os.Getenv("BENTO_PATH")
-	e.DashFullPath = os.Getenv("DASH_PATH")
-	e.SrcVidFullPath = os.Getenv("SRC_VID_PATH")
-	e.OutputDirectory = os.Getenv("OUTPUT_DIR")
+	e.ffmpegFullPath = os.Getenv("FFMPEG_PATH")
+	e.bentoFullPath = os.Getenv("BENTO_PATH")
+	e.dashFullPath = os.Getenv("DASH_PATH")
+	e.srcVidFullPath = os.Getenv("SRC_VID_PATH")
+	e.outputDirectory = os.Getenv("OUTPUT_DIR")
 
 	return nil
 }
 
-func createEnvVar() EnvVar {
-	var env EnvVar = &EnvVarImpl{}
+func createEnvVar() envVar {
+	var env envVar = &envVarImpl{}
 	return env
 }
