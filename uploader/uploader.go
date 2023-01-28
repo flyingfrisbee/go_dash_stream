@@ -3,7 +3,7 @@ package uploader
 import (
 	"GithubRepository/go_dash_stream/environment"
 	"fmt"
-	"time"
+	"os"
 )
 
 type uploader struct {
@@ -11,11 +11,7 @@ type uploader struct {
 	errChan      chan error
 }
 
-var (
-	Uploader uploader = initUploader()
-)
-
-func (u *uploader) StartUpload() error {
+func (u *uploader) StartUpload(movieTitle, episode string) (string, error) {
 	go func() {
 		err := sendAllFilePathInsideDirectory(environment.Env.OutputDir(), u.fileInfoChan)
 		u.errChan <- err
@@ -24,14 +20,21 @@ func (u *uploader) StartUpload() error {
 	for {
 		select {
 		case fileInfo := <-u.fileInfoChan:
-			// upload to firebase
-			<-time.After(1 * time.Second)
-			fmt.Printf("sent %v to firebase\n", fileInfo)
+			FBConn.uploadFile(movieTitle, episode, &fileInfo)
+			os.Remove(fileInfo.path)
 		case err := <-u.errChan:
-			return err
+			var manifestURL string
+			if err == nil {
+				manifestURL = fmt.Sprintf(downloadURLFormat, bucketURL, movieTitle, separator, episode, separator, manifestFileName)
+			}
+			return manifestURL, err
 		}
 	}
 }
+
+var (
+	Uploader uploader = initUploader()
+)
 
 func initUploader() uploader {
 	up := uploader{

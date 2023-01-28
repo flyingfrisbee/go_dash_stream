@@ -6,11 +6,6 @@ import (
 	"strings"
 )
 
-type fileInformation struct {
-	path    string
-	extType fileExtensionType
-}
-
 type fileExtensionType int
 
 const (
@@ -18,6 +13,12 @@ const (
 	audio
 	video
 )
+
+type fileInformation struct {
+	name    string
+	path    string
+	extType fileExtensionType
+}
 
 func sendAllFilePathInsideDirectory(directoryPath string, fileInfoChan chan<- fileInformation) error {
 	files, err := os.ReadDir(directoryPath)
@@ -37,6 +38,7 @@ func sendAllFilePathInsideDirectory(directoryPath string, fileInfoChan chan<- fi
 
 		filePath := filepath.Join(directoryPath, file.Name())
 		fileInfo := fileInformation{
+			name: file.Name(),
 			path: filePath,
 		}
 

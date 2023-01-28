@@ -3,3 +3,4 @@ raw_videos/*
 result/*
 encoder/strings.go
 uploader/strings.go
+uploader/*.json

@@ -23,21 +23,6 @@ type envVarImpl struct {
 	outputDirectory string
 }
 
-var (
-	Env envVar
-)
-
-func InitEnvironmentVariables() error {
-	Env = createEnvVar()
-
-	err := Env.loadVariablesFromDotEnv()
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func (e *envVarImpl) FFMPEGPath() string {
 	return e.ffmpegFullPath
 }
@@ -69,6 +54,21 @@ func (e *envVarImpl) loadVariablesFromDotEnv() error {
 	e.dashFullPath = os.Getenv("DASH_PATH")
 	e.srcVidFullPath = os.Getenv("SRC_VID_PATH")
 	e.outputDirectory = os.Getenv("OUTPUT_DIR")
+
+	return nil
+}
+
+var (
+	Env envVar
+)
+
+func InitEnvironmentVariables() error {
+	Env = createEnvVar()
+
+	err := Env.loadVariablesFromDotEnv()
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
