@@ -3,7 +3,6 @@ package uploader
 import (
 	"os"
 	"path/filepath"
-	"strings"
 )
 
 type fileExtensionType int
@@ -15,9 +14,8 @@ const (
 )
 
 type fileInformation struct {
-	name    string
-	path    string
-	extType fileExtensionType
+	name string
+	path string
 }
 
 func sendAllFilePathInsideDirectory(directoryPath string, fileInfoChan chan<- fileInformation) error {
@@ -40,15 +38,6 @@ func sendAllFilePathInsideDirectory(directoryPath string, fileInfoChan chan<- fi
 		fileInfo := fileInformation{
 			name: file.Name(),
 			path: filePath,
-		}
-
-		switch {
-		case strings.Contains(filePath, audioStr):
-			fileInfo.extType = audio
-		case strings.Contains(filePath, videoStr):
-			fileInfo.extType = video
-		default:
-			fileInfo.extType = manifest
 		}
 
 		fileInfoChan <- fileInfo

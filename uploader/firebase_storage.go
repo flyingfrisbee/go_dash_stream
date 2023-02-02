@@ -27,11 +27,11 @@ func (fbc *firebaseConn) uploadFile(movieTitle, episode string, fileInfo *fileIn
 	}
 	defer file.Close()
 
-	remotePath := fbc.generateRemoteDirectoryBasedOnExtensionType(fileInfo, movieTitle, episode)
+	remotePath := fmt.Sprintf("%s/%s/%s", movieTitle, episode, fileInfo.name)
 	wr := fbc.bucket.Object(remotePath).NewWriter(fbc.ctx)
 	defer wr.Close()
 
-	contentType := fbc.getContentTypeBasedOnFileFormat(fileInfo.path)
+	contentType := manifestAndSegmentContentType
 	isInvalidContentType := contentType == ""
 	if isInvalidContentType {
 		errMsg := fmt.Sprintf("cannot determine content type for file: %s", fileInfo.path)
@@ -48,31 +48,6 @@ func (fbc *firebaseConn) uploadFile(movieTitle, episode string, fileInfo *fileIn
 	if err != nil {
 		log.Fatal(err)
 		return
-	}
-}
-
-func (fbc *firebaseConn) generateRemoteDirectoryBasedOnExtensionType(fileInfo *fileInformation, movieTitle, episode string) string {
-	switch fileInfo.extType {
-	case audio:
-		return fmt.Sprintf("%s/%s/audio/%s", movieTitle, episode, fileInfo.name)
-	case video:
-		return fmt.Sprintf("%s/%s/video/%s", movieTitle, episode, fileInfo.name)
-	default:
-		return fmt.Sprintf("%s/%s/%s", movieTitle, episode, fileInfo.name)
-	}
-}
-
-func (fbc *firebaseConn) getContentTypeBasedOnFileFormat(filePath string) string {
-	length := len(filePath)
-	fileFormat := filePath[(length - 3):]
-
-	switch fileFormat {
-	case "mpd", "m4s":
-		return manifestAndSegmentContentType
-	case "mp4":
-		return mp4ContentType
-	default:
-		return ""
 	}
 }
 
