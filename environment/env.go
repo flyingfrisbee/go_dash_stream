@@ -1,79 +1,54 @@
 package environment
 
 import (
+	"log"
 	"os"
 
 	"github.com/joho/godotenv"
 )
 
-type envVar interface {
-	FFMPEGPath() string
-	BentoPath() string
-	DashPath() string
-	SrcVidPath() string
-	OutputDir() string
-	loadVariablesFromDotEnv() error
-}
-
-type envVarImpl struct {
-	ffmpegFullPath  string
-	bentoFullPath   string
-	dashFullPath    string
-	srcVidFullPath  string
-	outputDirectory string
-}
-
-func (e *envVarImpl) FFMPEGPath() string {
-	return e.ffmpegFullPath
-}
-
-func (e *envVarImpl) BentoPath() string {
-	return e.bentoFullPath
-}
-
-func (e *envVarImpl) DashPath() string {
-	return e.dashFullPath
-}
-
-func (e *envVarImpl) SrcVidPath() string {
-	return e.srcVidFullPath
-}
-
-func (e *envVarImpl) OutputDir() string {
-	return e.outputDirectory
-}
-
-func (e *envVarImpl) loadVariablesFromDotEnv() error {
-	err := godotenv.Load()
-	if err != nil {
-		return err
-	}
-
-	e.ffmpegFullPath = os.Getenv("FFMPEG_PATH")
-	e.bentoFullPath = os.Getenv("BENTO_PATH")
-	e.dashFullPath = os.Getenv("DASH_PATH")
-	e.srcVidFullPath = os.Getenv("SRC_VID_PATH")
-	e.outputDirectory = os.Getenv("OUTPUT_DIR")
-
-	return nil
-}
-
 var (
-	Env envVar
+	MP4BoxPath          string
+	FFMPEGPath          string
+	OutputDir           string
+	TempDir             string
+	FirebaseJSONPath    string
+	BucketURL           string
+	ExtractSubtitleFmt  string
+	ExtractAudioFmt     string
+	ExtractVideo720Fmt  string
+	ExtractVideo240Fmt  string
+	GenerateManifestFmt string
+	SubtitleExt         string
+	Mp4Ext              string
+	GenericExt          string
+	MetadataKey         string
+	VideoPath           string
+	FirebaseDir         string
 )
 
-func InitEnvironmentVariables() error {
-	Env = createEnvVar()
-
-	err := Env.loadVariablesFromDotEnv()
+func InitEnvironmentVariables() {
+	err := godotenv.Load()
 	if err != nil {
-		return err
+		log.Fatal(err)
 	}
 
-	return nil
-}
+	MP4BoxPath = os.Getenv("MP4BOX_PATH")
+	FFMPEGPath = os.Getenv("FFMPEG_PATH")
+	OutputDir = os.Getenv("OUT_DIR")
+	TempDir = os.Getenv("TEMP_DIR")
+	FirebaseJSONPath = os.Getenv("FIREBASE_JSON_PATH")
+	BucketURL = os.Getenv("BUCKET_URL")
+	ExtractSubtitleFmt = os.Getenv("EXTRACT_SUBTITLE_FMT")
+	ExtractAudioFmt = os.Getenv("EXTRACT_AUDIO_FMT")
+	ExtractVideo720Fmt = os.Getenv("EXTRACT_VIDEO_720_FMT")
+	ExtractVideo240Fmt = os.Getenv("EXTRACT_VIDEO_240_FMT")
+	GenerateManifestFmt = os.Getenv("GENERATE_MANIFEST_FMT")
+	SubtitleExt = os.Getenv("SUBTITLE_EXT")
+	Mp4Ext = os.Getenv("MP4_EXT")
+	GenericExt = os.Getenv("GENERIC_EXT")
+	MetadataKey = os.Getenv("METADATA_KEY")
 
-func createEnvVar() envVar {
-	var env envVar = &envVarImpl{}
-	return env
+	VideoPath = os.Getenv("VIDEO_PATH")
+	FirebaseDir = os.Getenv("FIREBASE_DIR")
 }

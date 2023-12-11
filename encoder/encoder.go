@@ -1,40 +1,50 @@
 package encoder
 
 import (
-	"GithubRepository/go_dash_stream/environment"
+	env "GithubRepository/go_dash_stream/environment"
 	"fmt"
+	"log"
 	"os"
-	"path/filepath"
+	"os/exec"
+	"path"
 	"strings"
 )
 
-func EncodeVideo(movieTitle, episode string) error {
-	srcVidPath := environment.Env.SrcVidPath()
-	outputDir := environment.Env.OutputDir()
-	mp4OutDst := filepath.Join(outputDir, "res.mp4")
-	frMP4OutDst := filepath.Join(outputDir, "res-fr.mp4")
-
-	err := runEncodeToMP4(srcVidPath, mp4OutDst)
+func StartEncoder() {
+	err := extractSubtitle()
 	if err != nil {
-		return err
+		log.Fatal(err)
 	}
 
-	err = runCreateFrMP4(mp4OutDst, frMP4OutDst)
+	err = extractAudio()
 	if err != nil {
-		return err
+		log.Fatal(err)
 	}
 
-	err = runCreateDash(frMP4OutDst, outputDir)
+	err = extractVideo()
 	if err != nil {
-		return err
+		log.Fatal(err)
 	}
 
-	err = removeUnusedFiles(mp4OutDst, frMP4OutDst)
+	err = generateManifestAndChunks()
 	if err != nil {
-		return err
+		log.Fatal(err)
 	}
 
-	err = modifyText(movieTitle, episode)
+	err = wipeDirectory(env.TempDir)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = modifyManifestFile()
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func extractSubtitle() error {
+	args := strings.Fields(fmt.Sprintf(env.ExtractSubtitleFmt, env.VideoPath))
+	err := runCommandFromCustomDir(env.OutputDir, env.FFMPEGPath, args...)
 	if err != nil {
 		return err
 	}
@@ -42,9 +52,68 @@ func EncodeVideo(movieTitle, episode string) error {
 	return nil
 }
 
-func removeUnusedFiles(filePaths ...string) error {
-	for _, filePath := range filePaths {
-		err := os.Remove(filePath)
+func extractAudio() error {
+	args := strings.Fields(fmt.Sprintf(env.ExtractAudioFmt, env.VideoPath, env.TempDir))
+	err := runCommandFromCustomDir(env.TempDir, env.FFMPEGPath, args...)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func extractVideo() error {
+	args := strings.Fields(fmt.Sprintf(env.ExtractVideo720Fmt, env.VideoPath, env.TempDir))
+	err := runCommandFromCustomDir(env.TempDir, env.FFMPEGPath, args...)
+	if err != nil {
+		return err
+	}
+
+	args = strings.Fields(fmt.Sprintf(env.ExtractVideo240Fmt, env.VideoPath, env.TempDir))
+	err = runCommandFromCustomDir(env.TempDir, env.FFMPEGPath, args...)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func generateManifestAndChunks() error {
+	args := strings.Fields(fmt.Sprintf(env.GenerateManifestFmt, env.OutputDir, env.TempDir, env.TempDir, env.TempDir))
+	err := runCommandFromCustomDir(env.OutputDir, env.MP4BoxPath, args...)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func runCommandFromCustomDir(dir, name string, args ...string) error {
+	cmd := exec.Command(name, args...)
+	cmd.Dir = dir
+
+	err := cmd.Run()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func wipeDirectory(dir string) error {
+	f, err := os.Open(dir)
+	if err != nil {
+		return err
+	}
+
+	files, err := f.ReadDir(-1)
+	if err != nil {
+		return err
+	}
+
+	for _, file := range files {
+		filePath := path.Join(dir, file.Name())
+		err = os.Remove(filePath)
 		if err != nil {
 			return err
 		}
@@ -53,62 +122,78 @@ func removeUnusedFiles(filePaths ...string) error {
 	return nil
 }
 
-func modifyText(movieTitle, episode string) error {
-	outputTextSlice := []string{}
-
-	bytes, err := os.ReadFile(manifestFilePath)
+func modifyManifestFile() error {
+	manifestFilePath := path.Join(env.OutputDir, "manifest.mpd")
+	outBytes, err := os.ReadFile(manifestFilePath)
 	if err != nil {
 		return err
 	}
-
-	sliceText := strings.Split(string(bytes), "\n")
-	for _, text := range sliceText {
-		shouldModifyText := strings.Contains(text, keyword1)
-		if shouldModifyText {
-			text = strings.Replace(text, keyword1, replacementText1, -1)
-			text = strings.Replace(text, keyword2, replacementText2, -1)
+	stringSlice := strings.Split(string(outBytes), "\n")
+	for i := 0; i < len(stringSlice); i++ {
+		if strings.Contains(stringSlice[i], "<SegmentTemplate") {
+			text := stringSlice[i]
+			text = addPrefixAndSuffix("media=", text)
+			text = addPrefixAndSuffix("initialization=", text)
+			stringSlice[i] = text
+			continue
 		}
-
-		shouldModifyVideoDirectory := strings.Contains(text, keyword3)
-		if shouldModifyVideoDirectory {
-			leftIndex := strings.Index(text, keyword5) + len(keyword5)
-			leftText := text[:leftIndex]
-
-			rightIndex := strings.Index(text, keyword6)
-			rightText := text[rightIndex:]
-
-			text = fmt.Sprintf(
-				textFormat,
-				leftText, movieTitle,
-				separator, episode, separator,
-				video, rightText,
-			)
+		if strings.Contains(stringSlice[i], "</Period>") {
+			textsToAppend := generateSubtitleTemplateForManifestFile()
+			textsToAppend = append(textsToAppend, stringSlice[i:]...)
+			stringSlice = append(stringSlice[:i], textsToAppend...)
+			break
 		}
-
-		shouldModifyAudioDirectory := strings.Contains(text, keyword4)
-		if shouldModifyAudioDirectory {
-			leftIndex := strings.Index(text, keyword5) + len(keyword5)
-			leftText := text[:leftIndex]
-
-			rightIndex := strings.Index(text, keyword6)
-			rightText := text[rightIndex:]
-
-			text = fmt.Sprintf(
-				textFormat,
-				leftText, movieTitle,
-				separator, episode, separator,
-				audio, rightText,
-			)
-		}
-
-		outputTextSlice = append(outputTextSlice, text)
 	}
 
-	modifiedText := strings.Join(outputTextSlice, "\n")
-	err = os.WriteFile(manifestFilePath, []byte(modifiedText), 0644)
+	f, err := os.OpenFile(manifestFilePath, os.O_WRONLY, 0666)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	_, err = f.WriteString(strings.Join(stringSlice, "\n"))
 	if err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func addPrefixAndSuffix(keyword, text string) string {
+	idxPlaceholder := strings.Index(text, keyword)
+	firstIdx := idxPlaceholder + len(keyword) + 1
+	lastIdx := 0
+
+	counter := 0
+	for i, v := range text[idxPlaceholder:] {
+		if v == '"' {
+			counter++
+		}
+		if counter == 2 {
+			lastIdx = idxPlaceholder + i
+			break
+		}
+	}
+
+	var sb strings.Builder
+	sb.WriteString(env.FirebaseDir)
+	sb.WriteString(`%2F`)
+	sb.WriteString(text[firstIdx:lastIdx])
+	sb.WriteString("?alt=media")
+
+	return strings.Replace(text, text[firstIdx:lastIdx], sb.String(), 1)
+}
+
+func generateSubtitleTemplateForManifestFile() []string {
+	text := fmt.Sprintf(
+		`<AdaptationSet mimeType="text/vtt" lang="en">
+	<Representation id="caption" bandwidth="123">
+		<BaseURL>https://firebasestorage.googleapis.com/v0/b/%s/o/%ssub.vtt?alt=media</BaseURL>
+	</Representation>
+</AdaptationSet>`,
+		env.BucketURL,
+		env.FirebaseDir+"%2F",
+	)
+
+	return strings.Split(text, "\n")
 }

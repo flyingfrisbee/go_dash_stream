@@ -1,7 +1,7 @@
 package uploader
 
 import (
-	"GithubRepository/go_dash_stream/environment"
+	env "GithubRepository/go_dash_stream/environment"
 	"fmt"
 	"os"
 )
@@ -11,21 +11,21 @@ type uploader struct {
 	errChan      chan error
 }
 
-func (u *uploader) StartUpload(movieTitle, episode string) (string, error) {
+func (u *uploader) StartUpload() (string, error) {
 	go func() {
-		err := sendAllFilePathInsideDirectory(environment.Env.OutputDir(), u.fileInfoChan)
+		err := sendAllFilePathInsideDirectory(env.OutputDir, u.fileInfoChan)
 		u.errChan <- err
 	}()
 
 	for {
 		select {
 		case fileInfo := <-u.fileInfoChan:
-			FBConn.uploadFile(movieTitle, episode, &fileInfo)
+			FBConn.uploadFile(&fileInfo)
 			os.Remove(fileInfo.path)
 		case err := <-u.errChan:
 			var manifestURL string
 			if err == nil {
-				manifestURL = fmt.Sprintf(downloadURLFormat, bucketURL, movieTitle, separator, episode, separator, manifestFileName)
+				manifestURL = fmt.Sprintf("https://firebasestorage.googleapis.com/v0/b/%s/o/%smanifest.mpd?alt=media", env.BucketURL, env.FirebaseDir+"%2F")
 			}
 			return manifestURL, err
 		}

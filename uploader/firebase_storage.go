@@ -1,8 +1,8 @@
 package uploader
 
 import (
+	env "GithubRepository/go_dash_stream/environment"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -19,7 +19,7 @@ type firebaseConn struct {
 	ctx    context.Context
 }
 
-func (fbc *firebaseConn) uploadFile(movieTitle, episode string, fileInfo *fileInformation) {
+func (fbc *firebaseConn) uploadFile(fileInfo *fileInformation) {
 	file, err := os.Open(fileInfo.path)
 	if err != nil {
 		log.Fatal(err)
@@ -27,21 +27,15 @@ func (fbc *firebaseConn) uploadFile(movieTitle, episode string, fileInfo *fileIn
 	}
 	defer file.Close()
 
-	remotePath := fbc.generateRemoteDirectoryBasedOnExtensionType(fileInfo, movieTitle, episode)
+	remotePath := fbc.generateRemotePath(fileInfo)
 	wr := fbc.bucket.Object(remotePath).NewWriter(fbc.ctx)
 	defer wr.Close()
 
 	contentType := fbc.getContentTypeBasedOnFileFormat(fileInfo.path)
-	isInvalidContentType := contentType == ""
-	if isInvalidContentType {
-		errMsg := fmt.Sprintf("cannot determine content type for file: %s", fileInfo.path)
-		log.Fatal(errors.New(errMsg))
-		return
-	}
 
 	wr.ContentType = contentType
 	wr.Metadata = map[string]string{
-		metadataKey: uuid.NewString(),
+		env.MetadataKey: uuid.NewString(),
 	}
 
 	_, err = io.Copy(wr, file)
@@ -51,15 +45,8 @@ func (fbc *firebaseConn) uploadFile(movieTitle, episode string, fileInfo *fileIn
 	}
 }
 
-func (fbc *firebaseConn) generateRemoteDirectoryBasedOnExtensionType(fileInfo *fileInformation, movieTitle, episode string) string {
-	switch fileInfo.extType {
-	case audio:
-		return fmt.Sprintf("%s/%s/audio/%s", movieTitle, episode, fileInfo.name)
-	case video:
-		return fmt.Sprintf("%s/%s/video/%s", movieTitle, episode, fileInfo.name)
-	default:
-		return fmt.Sprintf("%s/%s/%s", movieTitle, episode, fileInfo.name)
-	}
+func (fbc *firebaseConn) generateRemotePath(fileInfo *fileInformation) string {
+	return fmt.Sprintf("%s/%s", env.FirebaseDir, fileInfo.name)
 }
 
 func (fbc *firebaseConn) getContentTypeBasedOnFileFormat(filePath string) string {
@@ -67,12 +54,12 @@ func (fbc *firebaseConn) getContentTypeBasedOnFileFormat(filePath string) string
 	fileFormat := filePath[(length - 3):]
 
 	switch fileFormat {
-	case "mpd", "m4s":
-		return manifestAndSegmentContentType
+	case "vtt":
+		return env.SubtitleExt
 	case "mp4":
-		return mp4ContentType
+		return env.Mp4Ext
 	default:
-		return ""
+		return env.GenericExt
 	}
 }
 
@@ -94,9 +81,9 @@ func getConnectionToFirebaseBucket() (*firebaseConn, error) {
 	ctx := context.Background()
 
 	config := &firebase.Config{
-		StorageBucket: bucketURL,
+		StorageBucket: env.BucketURL,
 	}
-	opt := option.WithCredentialsFile(privateKeyPath)
+	opt := option.WithCredentialsFile(env.FirebaseJSONPath)
 	app, err := firebase.NewApp(ctx, config, opt)
 	if err != nil {
 		return nil, err
